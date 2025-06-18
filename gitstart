@@ -10,6 +10,8 @@ unset github_username dir repo license_url
 script_name=$(basename "$0")
 dir=""
 version="0.3.0"
+provider="github"  # default to github for backward compatibility
+gitlab_group=""    # GitLab group/namespace
 gitstart_cofig=$HOME/.gitstart_config
 
 usage() {
@@ -34,19 +36,27 @@ See https://github.com/github/gitignore
 Usage:
 ======
 
-$script_name [ -l | --lang programming_language ] [ -d | --dir directory ] [ -h | --help | -v | --version]
+$script_name [ -l | --lang programming_language ] [ -d | --dir directory ] [ --github | --gitlab ] [ -g | --group group_name ] [ -h | --help | -v | --version]
 
 Examples:
 =========
 
     $script_name -d newrepo
     $script_name -d newrepo -l python 
+    $script_name -d newrepo --gitlab
+    $script_name -d newrepo -l python --github
+    $script_name -d newrepo --gitlab -g proddev4/data
     # in a directory
     $script_name -d .
     # Show help
     $script_name -h
     # Show version
     $script_name -v
+    
+Environment Variables:
+=====================
+
+GITSTART_GITLAB_GROUP - Default GitLab group/namespace (e.g., "proddev4/data")
 EOF
 }
 
@@ -54,10 +64,22 @@ while (($# > 0)); do # while arguments count>0
     case "$1" in
     -l | --lang)
         prog_lang=$2
-        shift
+        shift 2
         ;;
     -d | --dir)
         dir=$2
+        shift 2
+        ;;
+    --github)
+        provider="github"
+        shift
+        ;;
+    --gitlab)
+        provider="gitlab"
+        shift
+        ;;
+    -g | --group)
+        gitlab_group=$2
         shift 2
         ;;
     -h | --help)
@@ -76,9 +98,17 @@ while (($# > 0)); do # while arguments count>0
 done
 
 ##### check
-if [ ! "$(command -v gh)" ]; then
-    echo "Please install gh from https://github.com/cli/cli#installation."
-    exit 1
+# Check for required CLI tool based on provider
+if [[ "$provider" == "github" ]]; then
+    if [ ! "$(command -v gh)" ]; then
+        echo "Please install gh from https://github.com/cli/cli#installation."
+        exit 1
+    fi
+elif [[ "$provider" == "gitlab" ]]; then
+    if [ ! "$(command -v glab)" ]; then
+        echo "Please install glab from https://gitlab.com/gitlab-org/cli/-/releases"
+        exit 1
+    fi
 fi
 
 if [ ! "$(command -v jq)" ]; then
@@ -87,11 +117,11 @@ if [ ! "$(command -v jq)" ]; then
 fi
 
 ############# Main body ############
-# check if you are logged in github
-if [[ $(gh auth status) -eq 1 ]]; then
-    # not logged-in
-    echo ">>> You must logged in. Use 'gh auth login'"
-    exit 1
+# Since SSH keys are configured, we skip auth checks and proceed directly
+
+# Set GitLab group/namespace from environment variable if not specified via flag
+if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
+    gitlab_group="${GITSTART_GITLAB_GROUP:-}"
 fi
 
 # Directory path. If dir is . then use pwd
@@ -111,30 +141,52 @@ if [[ (${dir} = "$HOME") ]]; then
     exit 1
 fi
 
-gitname() {
-    printf "Please type your Github username. "
-    read -r github_username
-    echo "$github_username" >"$gitstart_cofig"
+get_username() {
+    local provider_name="$1"
+    local config_file="$2"
+    
+    if [ ! -s "$config_file" ]; then
+        printf "Please type your %s username. " "$provider_name"
+        read -r username
+        echo "$username" >"$config_file"
+        echo "$username"
+    else
+        username=$(cat "$config_file")
+        echo "Is it correct your $provider_name username is $username. y/yes/n/no"
+        read -r ANS
+        ans=$(echo "$ANS" | cut -c 1-1 | tr "[:lower:]" "[:upper:]")
+        if [[ $ans = "Y" ]]; then
+            echo "$username"
+        else
+            printf "Please type your %s username. " "$provider_name"
+            read -r username
+            echo "$username" >"$config_file"
+            echo "$username"
+        fi
+    fi
 }
 
-if [ ! -s "$gitstart_cofig" ]; then
-    gitname
-else
-    github_username=$(cat "$gitstart_cofig")
-    echo "Is it correct your GitHub username is $github_username. y/yes/n/no"
-    read -r ANS
-    ans=$(echo "$ANS" | cut -c 1-1 | tr "[:lower:]" "[:upper:]")
-    if [[ $ans = "Y" ]]; then
-        :
-    else
-        gitname
-    fi
+# Get username based on provider
+if [[ "$provider" == "github" ]]; then
+    github_username=$(get_username "GitHub" "$gitstart_cofig")
+elif [[ "$provider" == "gitlab" ]]; then
+    gitlab_config="$HOME/.gitstart_config_gitlab"
+    gitlab_username=$(get_username "GitLab" "$gitlab_config")
 fi
 
 repo=$(basename "${dir}")
 license_url="mit"
-echo ">>> Your github username is ${github_username}."
+
+# Display username and repo info based on provider
+if [[ "$provider" == "github" ]]; then
+    echo ">>> Your GitHub username is ${github_username}."
+    current_username="$github_username"
+elif [[ "$provider" == "gitlab" ]]; then
+    echo ">>> Your GitLab username is ${gitlab_username}."
+    current_username="$gitlab_username"
+fi
 echo ">>> Your new repo name is ${repo}."
+echo ">>> Using provider: ${provider}"
 
 # license
 PS3='Your license: '
@@ -174,9 +226,78 @@ if [ ! -d "$dir" ]; then
     mkdir -p "$dir"
 fi
 
-# creating a remote github repo using gh
-printf "Creating a public remote repo %s" "$dir"
-gh repo create "$repo" --public --clone || {
+create_repo() {
+    local provider="$1"
+    local repo_name="$2"
+    local visibility="$3"
+    local group="$4"
+    
+    if [[ "$provider" == "github" ]]; then
+        echo ">>> Creating GitHub repository..."
+        if [[ "$visibility" == "public" ]]; then
+            gh repo create "$repo_name" --public --clone
+        else
+            gh repo create "$repo_name" --private --clone
+        fi
+    elif [[ "$provider" == "gitlab" ]]; then
+        echo ">>> Creating GitLab repository..."
+        local full_repo_name="$repo_name"
+        
+        # Add group/namespace if specified
+        if [[ -n "$group" ]]; then
+            full_repo_name="$group/$repo_name"
+            echo ">>> Using GitLab group/namespace: $group"
+        fi
+        
+        case "$visibility" in
+            "public")
+                glab repo create "$full_repo_name" --public --clone
+                ;;
+            "private")
+                glab repo create "$full_repo_name" --private --clone
+                ;;
+            "internal")
+                glab repo create "$full_repo_name" --internal --clone
+                ;;
+        esac
+    fi
+}
+
+# Get visibility preference for GitLab (GitHub only has public/private)
+if [[ "$provider" == "gitlab" ]]; then
+    echo ">>> You are using GitLab. Choose visibility:"
+    PS3='Repository visibility: '
+    visibilities=("Public" "Internal" "Private" "Quit")
+    
+    select visibility in "${visibilities[@]}"; do
+        case ${visibility} in
+            "Public")
+                repo_visibility="public"
+                break
+                ;;
+            "Internal")
+                repo_visibility="internal"
+                break
+                ;;
+            "Private")
+                repo_visibility="private"
+                break
+                ;;
+            "Quit")
+                echo "User requested exit."
+                exit
+                ;;
+            *) echo "Invalid option $REPLY" ;;
+        esac
+    done
+else
+    # GitHub - default to public for backward compatibility
+    repo_visibility="public"
+fi
+
+# Create the remote repository
+printf "Creating remote repo %s" "$dir"
+create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
     echo "Not able to create a remote repo."
     exit 1
 }
@@ -247,6 +368,15 @@ git push -u origin main || {
     exit 1
 }
 
-echo ">>> You have created a github repo at https://github.com/${github_username}/${repo}"
+# Display success message with correct URL
+if [[ "$provider" == "github" ]]; then
+    echo ">>> You have created a GitHub repo at https://github.com/${current_username}/${repo}"
+elif [[ "$provider" == "gitlab" ]]; then
+    if [[ -n "$gitlab_group" ]]; then
+        echo ">>> You have created a GitLab repo at https://gitlab.com/${gitlab_group}/${repo}"
+    else
+        echo ">>> You have created a GitLab repo at https://gitlab.com/${current_username}/${repo}"
+    fi
+fi
 
 exit 0
