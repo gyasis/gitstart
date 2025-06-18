@@ -251,13 +251,13 @@ create_repo() {
         
         case "$visibility" in
             "public")
-                glab repo create "$full_repo_name" --public --clone
+                glab repo create "$full_repo_name" --public
                 ;;
             "private")
-                glab repo create "$full_repo_name" --private --clone
+                glab repo create "$full_repo_name" --private
                 ;;
             "internal")
-                glab repo create "$full_repo_name" --internal --clone
+                glab repo create "$full_repo_name" --internal
                 ;;
         esac
     fi
@@ -303,6 +303,30 @@ create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
 }
 
 cd "$dir" || exit
+
+# Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
+if [[ "$provider" == "gitlab" ]]; then
+    if [ ! -d ".git" ]; then
+        echo ">>> Running git init."
+        git init || {
+            echo "Not able to initialize git."
+            exit 1
+        }
+    fi
+    
+    # Set up remote for GitLab
+    if [[ -n "$gitlab_group" ]]; then
+        remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
+    else
+        remote_url="git@gitlab.com:${current_username}/${repo}.git"
+    fi
+    
+    echo ">>> Adding remote origin: $remote_url"
+    git remote add origin "$remote_url" || {
+        echo "Not able to add remote."
+        exit 1
+    }
+fi
 
 if [[ ${license_url} != false ]]; then
     touch "${dir}"/LICENSE
