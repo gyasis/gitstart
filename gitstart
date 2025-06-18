@@ -146,19 +146,19 @@ get_username() {
     local config_file="$2"
     
     if [ ! -s "$config_file" ]; then
-        printf "Please type your %s username. " "$provider_name"
+        printf "Please type your %s username. " "$provider_name" >&2
         read -r username
         echo "$username" >"$config_file"
         echo "$username"
     else
         username=$(cat "$config_file")
-        echo "Is it correct your $provider_name username is $username. y/yes/n/no"
+        printf "Is it correct your %s username is %s? y/yes/n/no: " "$provider_name" "$username" >&2
         read -r ANS
         ans=$(echo "$ANS" | cut -c 1-1 | tr "[:lower:]" "[:upper:]")
         if [[ $ans = "Y" ]]; then
             echo "$username"
         else
-            printf "Please type your %s username. " "$provider_name"
+            printf "Please type your %s username. " "$provider_name" >&2
             read -r username
             echo "$username" >"$config_file"
             echo "$username"
