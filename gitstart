@@ -23,10 +23,12 @@ Description:
 ============
 
 This script automate creating git repo.
-This will create a dir, add a license, README file, run git init and push to Github. 
+This will create a dir, add a license, README file, run git init and push to GitHub or GitLab. 
 
 If a language is added, it will try to add the .gitignore.
 Choose SSH as the default git protocol.
+
+For GitLab, you can specify a group/namespace using -g flag or GITSTART_GITLAB_GROUP environment variable. The script will guide you through setup if neither is configured.
 
 List of .gitignore supported by Github
 ======================================
@@ -57,6 +59,7 @@ Environment Variables:
 =====================
 
 GITSTART_GITLAB_GROUP - Default GitLab group/namespace (e.g., "proddev4/data")
+                       Note: The -g flag overrides this environment variable
 EOF
 }
 
@@ -122,6 +125,49 @@ fi
 # Set GitLab group/namespace from environment variable if not specified via flag
 if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
     gitlab_group="${GITSTART_GITLAB_GROUP:-}"
+fi
+
+# Show GitLab configuration status
+if [[ "$provider" == "gitlab" && -n "$gitlab_group" ]]; then
+    if [[ -n "${GITSTART_GITLAB_GROUP:-}" && "$gitlab_group" == "$GITSTART_GITLAB_GROUP" ]]; then
+        echo "✅ Using GitLab group from environment: $gitlab_group"
+    else
+        echo "✅ Using GitLab group from -g flag: $gitlab_group"
+    fi
+    echo ""
+fi
+
+# Warning and guidance for GitLab without group configuration
+if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
+    echo "⚠️  WARNING: No GitLab group/namespace specified!"
+    echo ""
+    echo "GitLab repos will be created under your personal namespace."
+    echo "For organizational use, consider setting up a group/namespace:"
+    echo ""
+    echo "Option 1: Use the -g flag:"
+    echo "  gitstart -d your-repo-name --gitlab -g your-org/your-workspace"
+    echo ""
+    echo "Option 2: Set environment variable (recommended for teams):"
+    echo "  export GITSTART_GITLAB_GROUP=\"your-org/your-workspace\""
+    echo "  echo 'export GITSTART_GITLAB_GROUP=\"your-org/your-workspace\"' >> ~/.bashrc"
+    echo ""
+    echo "Examples:"
+    echo "  - Company: export GITSTART_GITLAB_GROUP=\"acme-corp/engineering\""
+    echo "  - Team:    export GITSTART_GITLAB_GROUP=\"frontend-team/projects\""
+    echo "  - Dept:    export GITSTART_GITLAB_GROUP=\"marketing/campaigns\""
+    echo ""
+    printf "Continue with personal namespace? (y/n): "
+    read -r continue_choice
+    case "$continue_choice" in
+        [Yy]|[Yy][Ee][Ss])
+            echo ">>> Continuing with personal GitLab namespace..."
+            ;;
+        *)
+            echo ">>> Setup cancelled. Please configure your group and try again."
+            exit 0
+            ;;
+    esac
+    echo ""
 fi
 
 # Directory path. If dir is . then use pwd
