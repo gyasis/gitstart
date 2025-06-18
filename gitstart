@@ -315,18 +315,23 @@ if [[ "$provider" == "gitlab" ]]; then
         }
     fi
     
-    # Set up remote for GitLab
-    if [[ -n "$gitlab_group" ]]; then
-        remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
+    # Check if remote already exists (glab might have added it)
+    if ! git remote get-url origin >/dev/null 2>&1; then
+        # Set up remote for GitLab
+        if [[ -n "$gitlab_group" ]]; then
+            remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
+        else
+            remote_url="git@gitlab.com:${current_username}/${repo}.git"
+        fi
+        
+        echo ">>> Adding remote origin: $remote_url"
+        git remote add origin "$remote_url" || {
+            echo "Not able to add remote."
+            exit 1
+        }
     else
-        remote_url="git@gitlab.com:${current_username}/${repo}.git"
+        echo ">>> Remote origin already configured."
     fi
-    
-    echo ">>> Adding remote origin: $remote_url"
-    git remote add origin "$remote_url" || {
-        echo "Not able to add remote."
-        exit 1
-    }
 fi
 
 if [[ ${license_url} != false ]]; then
