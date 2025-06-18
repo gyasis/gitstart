@@ -241,23 +241,24 @@ create_repo() {
         fi
     elif [[ "$provider" == "gitlab" ]]; then
         echo ">>> Creating GitLab repository..."
-        local full_repo_name="$repo_name"
         
-        # Add group/namespace if specified
+        # Build glab command with group if specified
+        local glab_cmd="glab repo create \"$repo_name\""
+        
         if [[ -n "$group" ]]; then
-            full_repo_name="$group/$repo_name"
             echo ">>> Using GitLab group/namespace: $group"
+            glab_cmd="$glab_cmd -g \"$group\""
         fi
         
         case "$visibility" in
             "public")
-                glab repo create "$full_repo_name" --public
+                eval "$glab_cmd --public"
                 ;;
             "private")
-                glab repo create "$full_repo_name" --private
+                eval "$glab_cmd --private"
                 ;;
             "internal")
-                glab repo create "$full_repo_name" --internal
+                eval "$glab_cmd --internal"
                 ;;
         esac
     fi
