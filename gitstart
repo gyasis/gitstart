@@ -311,13 +311,13 @@ create_repo() {
         
         case "$visibility" in
             "public")
-                eval "$glab_cmd --public --remote-only"
+                eval "$glab_cmd --public"
                 ;;
             "private")
-                eval "$glab_cmd --private --remote-only"
+                eval "$glab_cmd --private"
                 ;;
             "internal")
-                eval "$glab_cmd --internal --remote-only"
+                eval "$glab_cmd --internal"
                 ;;
         esac
     fi
@@ -364,13 +364,15 @@ create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
 
 cd "$dir" || exit
 
-# Configure Git user email based on provider
+# Configure Git user email and signing based on provider
 if [[ "$provider" == "github" ]]; then
     git config user.email "gyasis@gmail.com"
     echo ">>> Configured Git email for GitHub: gyasis@gmail.com"
 elif [[ "$provider" == "gitlab" ]]; then
     git config user.email "gyasi.sutton@herself-health.com"
+    git config commit.gpgsign false
     echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
+    echo ">>> Disabled GPG signing for GitLab repository"
 fi
 
 # Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
