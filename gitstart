@@ -190,10 +190,17 @@ fi
 get_username() {
     local provider_name="$1"
     local config_file="$2"
+    local default_username="$3"
     
     if [ ! -s "$config_file" ]; then
-        printf "Please type your %s username. " "$provider_name" >&2
-        read -r username
+        if [[ -n "$default_username" ]]; then
+            printf "Please type your %s username [%s]: " "$provider_name" "$default_username" >&2
+            read -r username
+            username=${username:-$default_username}
+        else
+            printf "Please type your %s username. " "$provider_name" >&2
+            read -r username
+        fi
         echo "$username" >"$config_file"
         echo "$username"
     else
@@ -204,8 +211,14 @@ get_username() {
         if [[ $ans = "Y" ]]; then
             echo "$username"
         else
-            printf "Please type your %s username. " "$provider_name" >&2
-            read -r username
+            if [[ -n "$default_username" ]]; then
+                printf "Please type your %s username [%s]: " "$provider_name" "$default_username" >&2
+                read -r username
+                username=${username:-$default_username}
+            else
+                printf "Please type your %s username. " "$provider_name" >&2
+                read -r username
+            fi
             echo "$username" >"$config_file"
             echo "$username"
         fi
@@ -214,10 +227,10 @@ get_username() {
 
 # Get username based on provider
 if [[ "$provider" == "github" ]]; then
-    github_username=$(get_username "GitHub" "$gitstart_config")
+    github_username=$(get_username "GitHub" "$gitstart_config" "gyasis")
 elif [[ "$provider" == "gitlab" ]]; then
     gitlab_config="$HOME/.gitstart_config_gitlab"
-    gitlab_username=$(get_username "GitLab" "$gitlab_config")
+    gitlab_username=$(get_username "GitLab" "$gitlab_config" "gyasis")
 fi
 
 repo=$(basename "${dir}")
@@ -431,10 +444,17 @@ git add . || {
     exit 1
 }
 echo ">>> Commiting with a message 'first commit'."
-git commit -m "first commit" || {
-    echo "Not able to commit."
-    exit 1
-}
+if [[ "$provider" == "gitlab" ]]; then
+    git commit -S -m "first commit" || {
+        echo "Not able to commit."
+        exit 1
+    }
+else
+    git commit -m "first commit" || {
+        echo "Not able to commit."
+        exit 1
+    }
+fi
 git branch -M main || {
     echo "Not able to add the branch"
     exit 1
