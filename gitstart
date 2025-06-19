@@ -364,6 +364,15 @@ create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
 
 cd "$dir" || exit
 
+# Configure Git user email based on provider
+if [[ "$provider" == "github" ]]; then
+    git config user.email "gyasis@gmail.com"
+    echo ">>> Configured Git email for GitHub: gyasis@gmail.com"
+elif [[ "$provider" == "gitlab" ]]; then
+    git config user.email "gyasi.sutton@herself-health.com"
+    echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
+fi
+
 # Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
 if [[ "$provider" == "gitlab" ]]; then
     if [ ! -d ".git" ]; then
@@ -444,17 +453,10 @@ git add . || {
     exit 1
 }
 echo ">>> Commiting with a message 'first commit'."
-if [[ "$provider" == "gitlab" ]]; then
-    git commit -S -m "first commit" || {
-        echo "Not able to commit."
-        exit 1
-    }
-else
-    git commit -m "first commit" || {
-        echo "Not able to commit."
-        exit 1
-    }
-fi
+git commit -m "first commit" || {
+    echo "Not able to commit."
+    exit 1
+}
 git branch -M main || {
     echo "Not able to add the branch"
     exit 1
