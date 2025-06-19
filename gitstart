@@ -370,9 +370,9 @@ if [[ "$provider" == "github" ]]; then
     echo ">>> Configured Git email for GitHub: gyasis@gmail.com"
 elif [[ "$provider" == "gitlab" ]]; then
     git config user.email "gyasi.sutton@herself-health.com"
-    git config commit.gpgsign false
+    git config user.signingkey "96132160E21A89003E03337A0AC7D767310FB350"
     echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
-    echo ">>> Disabled GPG signing for GitLab repository"
+    echo ">>> Configured GPG signing key for GitLab"
 fi
 
 # Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
@@ -455,10 +455,17 @@ git add . || {
     exit 1
 }
 echo ">>> Commiting with a message 'first commit'."
-git commit -m "first commit" || {
-    echo "Not able to commit."
-    exit 1
-}
+if [[ "$provider" == "gitlab" ]]; then
+    git commit -S -m "first commit" || {
+        echo "Not able to commit."
+        exit 1
+    }
+else
+    git commit -m "first commit" || {
+        echo "Not able to commit."
+        exit 1
+    }
+fi
 git branch -M main || {
     echo "Not able to add the branch"
     exit 1
