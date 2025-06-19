@@ -12,7 +12,7 @@ dir=""
 version="0.3.0"
 provider="github"  # default to github for backward compatibility
 gitlab_group=""    # GitLab group/namespace
-gitstart_cofig=$HOME/.gitstart_config
+gitstart_config=$HOME/.gitstart_config
 
 usage() {
     cat <<EOF
@@ -214,7 +214,7 @@ get_username() {
 
 # Get username based on provider
 if [[ "$provider" == "github" ]]; then
-    github_username=$(get_username "GitHub" "$gitstart_cofig")
+    github_username=$(get_username "GitHub" "$gitstart_config")
 elif [[ "$provider" == "gitlab" ]]; then
     gitlab_config="$HOME/.gitstart_config_gitlab"
     gitlab_username=$(get_username "GitLab" "$gitlab_config")
