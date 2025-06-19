@@ -311,13 +311,13 @@ create_repo() {
         
         case "$visibility" in
             "public")
-                eval "$glab_cmd --public"
+                eval "$glab_cmd --public --remote-only"
                 ;;
             "private")
-                eval "$glab_cmd --private"
+                eval "$glab_cmd --private --remote-only"
                 ;;
             "internal")
-                eval "$glab_cmd --internal"
+                eval "$glab_cmd --internal --remote-only"
                 ;;
         esac
     fi
