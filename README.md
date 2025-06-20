@@ -231,6 +231,135 @@ Gitstart supports .gitignore templates for any language available in [GitHub's g
 
 These files are created automatically when you first run the script with each provider.
 
+## ⚠️ Important Setup Notes
+
+### GitLab GPG Signing Requirements
+
+Many GitLab repositories (especially enterprise/organization repos) require **GPG-signed commits**. If you encounter this error:
+
+```
+remote: GitLab: Commit must be signed with a GPG key
+! [remote rejected] main -> main (pre-receive hook declined)
+```
+
+**You need to set up GPG keys:**
+
+1. **Check if you have GPG keys:**
+   ```bash
+   gpg --list-keys
+   ```
+
+2. **Generate a GPG key if needed:**
+   ```bash
+   gpg --full-generate-key
+   # Choose RSA and RSA (default)
+   # Choose 4096 bits
+   # Set expiration (recommended: 1 year)
+   # Enter your name and GitLab email address
+   ```
+
+3. **Add GPG key to GitLab:**
+   ```bash
+   # Export your public key
+   gpg --armor --export YOUR_EMAIL@example.com
+   
+   # Copy the output and add it to GitLab:
+   # GitLab → Settings → GPG Keys → Add Key
+   ```
+
+4. **Configure Git to use your GPG key:**
+   ```bash
+   # Get your key ID
+   gpg --list-secret-keys --keyid-format LONG
+   
+   # Configure Git globally (optional)
+   git config --global user.signingkey YOUR_KEY_ID
+   git config --global commit.gpgsign true
+   ```
+
+**Note:** Gitstart automatically configures GPG signing for GitLab repositories when it detects your GPG key.
+
+### Different Email Addresses
+
+Gitstart automatically handles different email addresses for each platform:
+- **GitHub**: Uses the email from your GitHub account
+- **GitLab**: Uses your GitLab/organization email
+
+The script sets the correct email per repository based on the provider.
+
+### WSL (Windows Subsystem for Linux) Issues
+
+If you're using WSL and encounter GPG passphrase prompts that fail:
+
+1. **Set GPG_TTY environment variable:**
+   ```bash
+   echo 'export GPG_TTY=$(tty)' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+2. **Install and configure pinentry for WSL:**
+   ```bash
+   sudo apt install pinentry-curses
+   echo 'pinentry-program /usr/bin/pinentry-curses' >> ~/.gnupg/gpg-agent.conf
+   gpg-connect-agent reloadagent /bye
+   ```
+
+3. **For WSL2 with Windows integration:**
+   ```bash
+   # Install pinentry-wsl-ps1 for Windows integration
+   wget https://github.com/diablodale/pinentry-wsl-ps1/releases/latest/download/pinentry-wsl-ps1.sh
+   chmod +x pinentry-wsl-ps1.sh
+   sudo mv pinentry-wsl-ps1.sh /usr/local/bin/
+   echo 'pinentry-program /usr/local/bin/pinentry-wsl-ps1.sh' >> ~/.gnupg/gpg-agent.conf
+   ```
+
+### GitLab CLI Directory Prompt
+
+When using GitLab, you'll see this prompt:
+```
+? Create a local project directory for Organization / project-name? 
+```
+
+**Always answer "Yes"** - this is normal GitLab CLI behavior and creates the local repository structure.
+
+### Default Username Configuration
+
+Gitstart now provides default usernames during setup:
+- First-time setup prompts: `Please type your GitHub username [gyasis]:`
+- Just press Enter to use the default, or type your actual username
+
+### Troubleshooting Common Issues
+
+1. **"command not found: gitstart"**
+   ```bash
+   # Make sure awesome/bin is in your PATH
+   echo 'export PATH=$HOME/.local/share/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+2. **SSH key issues:**
+   ```bash
+   # Test connections
+   ssh -T git@github.com
+   ssh -T git@gitlab.com
+   
+   # Generate SSH keys if needed
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   ```
+
+3. **Permission denied errors:**
+   ```bash
+   # Make sure gitstart is executable
+   chmod +x ~/.local/share/awesome/gitstart/gitstart
+   ```
+
+4. **GitLab group not found:**
+   ```bash
+   # Verify your group path
+   glab api user | jq '.groups'
+   # Or check: https://gitlab.com/groups
+   ```
+
 ## 🗑️ Uninstallation
 
 ```bash
