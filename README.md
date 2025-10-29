@@ -93,6 +93,40 @@ sudo apt install jq
 brew install jq
 ```
 
+### Updating Gitstart
+
+**If installed via Awesome:**
+```bash
+awesome update gitstart
+# Or update all packages
+awesome update all
+```
+
+**If installed via Homebrew:**
+```bash
+brew upgrade gitstart
+```
+
+**If installed manually:**
+```bash
+# Remove old version
+sudo rm /usr/local/bin/gitstart
+
+# Clone latest version
+cd /tmp
+git clone https://github.com/gyasis/gitstart.git
+chmod +x gitstart/gitstart
+sudo cp gitstart/gitstart /usr/local/bin/gitstart
+
+# Verify version
+gitstart -v
+```
+
+**Check current version:**
+```bash
+gitstart -v
+```
+
 ## 🔧 Configuration
 
 ### Authentication Setup
@@ -155,6 +189,82 @@ gitstart -d my-repo -l javascript --gitlab
 # Work in current directory
 cd existing_directory
 gitstart . --gitlab
+```
+
+### Complete Workflow Examples
+
+**Example 1: Creating a GitHub Python project**
+```bash
+$ gitstart -d my-python-app -l python --github
+
+>>> Creating my-python-app.
+Is it correct your GitHub username is gyasis? y/yes/n/no: y
+>>> Your GitHub username is gyasis.
+>>> Your new repo name is my-python-app.
+>>> Using provider: github
+Select a license:
+1) MIT: I want it simple and permissive.
+2) Apache License 2.0: I need to work in a community.
+3) GNU GPLv3: I care about sharing improvements.
+4) None
+5) Quit
+Your license: 1
+MIT
+Creating remote repo /home/user/my-python-app
+>>> Creating GitHub repository...
+✓ Created repository gyasis/my-python-app on GitHub
+✓ Added remote git@github.com:gyasis/my-python-app.git
+>>> Configured Git email for GitHub: user@example.com
+>>> LICENSE is created.
+>>> Creating .gitignore for Python...
+>>> .gitignore created.
+>>> Creating README.md.
+>>> Adding README.md and .gitignore.
+>>> Commiting with a message 'first commit'.
+>>> You have created a GitHub repo at https://github.com/gyasis/my-python-app
+```
+
+**Example 2: Creating a GitLab project in organization**
+```bash
+$ export GITSTART_GITLAB_GROUP="acme-corp/data-team"
+$ gitstart -d customer-analytics -l python --gitlab
+
+✅ Using GitLab group from environment: acme-corp/data-team
+
+>>> Creating customer-analytics.
+Is it correct your GitLab username is gyasis? y/yes/n/no: y
+>>> Your GitLab username is gyasis.
+>>> Your new repo name is customer-analytics.
+>>> Using provider: gitlab
+Select a license:
+1) MIT: I want it simple and permissive.
+2) Apache License 2.0: I need to work in a community.
+3) GNU GPLv3: I care about sharing improvements.
+4) None
+5) Quit
+Your license: 1
+MIT
+>>> You are using GitLab. Choose visibility:
+1) Public
+2) Internal
+3) Private
+4) Quit
+Repository visibility: 2
+Internal
+Creating remote repo /home/user/customer-analytics
+>>> Creating GitLab repository...
+>>> Using GitLab group/namespace: acme-corp/data-team
+✓ Created repository acme-corp/data-team/customer-analytics on GitLab
+>>> Configured Git email for GitLab: user@company.com
+>>> Configured GPG signing key for GitLab
+>>> LICENSE is created.
+>>> Creating .gitignore for Python...
+>>> .gitignore created.
+>>> Creating README.md.
+>>> Adding README.md and .gitignore.
+>>> Commiting with a message 'first commit'.
+[main 1a2b3c4] first commit
+>>> You have created a GitLab repo at https://gitlab.com/acme-corp/data-team/customer-analytics
 ```
 
 ### Command Line Options
@@ -359,6 +469,72 @@ Gitstart now provides default usernames during setup:
    glab api user | jq '.groups'
    # Or check: https://gitlab.com/groups
    ```
+
+## 🔧 For Maintainers and Forkers
+
+If you're forking this project or customizing it for your organization, you'll need to update these hardcoded values in the `gitstart` script:
+
+### Hardcoded Credentials
+
+**Lines 230, 233** - Default username:
+```bash
+github_username=$(get_username "GitHub" "$gitstart_config" "YOUR_GITHUB_USERNAME")
+gitlab_username=$(get_username "GitLab" "$gitlab_config" "YOUR_GITLAB_USERNAME")
+```
+
+**Line 369** - GitHub email:
+```bash
+git config user.email "YOUR_GITHUB_EMAIL@example.com"
+```
+
+**Lines 372-373** - GitLab email and GPG key:
+```bash
+git config user.email "YOUR_GITLAB_EMAIL@example.com"
+git config user.signingkey "YOUR_GPG_KEY_ID"
+```
+
+### Finding Your GPG Key ID
+
+```bash
+gpg --list-secret-keys --keyid-format LONG
+# Look for sec rsa4096/YOUR_KEY_ID in the output
+# Example output:
+# sec   rsa4096/96132160E21A8900 2024-01-15 [SC]
+#       96132160E21A89003E03337A0AC7D767310FB350
+# The key ID is: 96132160E21A89003E03337A0AC7D767310FB350
+```
+
+### Making It Configurable (Recommended)
+
+For a more maintainable approach, consider extracting these to environment variables in your fork:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export GITSTART_GITHUB_EMAIL="your.email@gmail.com"
+export GITSTART_GITLAB_EMAIL="your.email@company.com"
+export GITSTART_GITLAB_GPG_KEY="YOUR_KEY_ID"
+export GITSTART_DEFAULT_USERNAME="your-username"
+```
+
+Then modify the script to read from these variables instead of using hardcoded values.
+
+### Testing Your Fork
+
+After customizing, test both platforms:
+```bash
+# Test GitHub
+gitstart -d test-github-repo --github
+cd test-github-repo && git log --show-signature
+
+# Test GitLab
+gitstart -d test-gitlab-repo --gitlab
+cd test-gitlab-repo && git log --show-signature
+```
+
+Verify that:
+- Correct email addresses are used
+- GPG signing works for GitLab
+- Default usernames are appropriate
 
 ## 🗑️ Uninstallation
 

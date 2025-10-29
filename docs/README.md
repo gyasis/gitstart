@@ -80,8 +80,39 @@ Download the latest version from [releases page](https://github.com/shinokada/gi
 sudo apt install ./gitstart_version_all.deb
 ```
 
+## Updating Gitstart
 
+**If installed via Awesome:**
+```sh
+awesome update gitstart
+# Or update all packages
+awesome update all
+```
 
+**If installed via Homebrew:**
+```sh
+brew upgrade gitstart
+```
+
+**If installed manually:**
+```sh
+# Remove old version
+sudo rm /usr/local/bin/gitstart
+
+# Clone latest version
+cd /tmp
+git clone https://github.com/gyasis/gitstart.git
+chmod +x gitstart/gitstart
+sudo cp gitstart/gitstart /usr/local/bin/gitstart
+
+# Verify version
+gitstart -v
+```
+
+**Check current version:**
+```sh
+gitstart -v
+```
 
 ## Uninstallation
 
@@ -152,6 +183,63 @@ gitstart -d repo-name --gitlab
 **GitHub:** Choose between Public or Private (default: Public)
 
 **GitLab:** Choose between Public, Internal, or Private (default: Internal)
+
+### GPG Signing Requirements
+
+Gitstart automatically configures GPG signing for GitLab repositories. Many GitLab organizations require GPG-signed commits for security.
+
+**Error You Might See:**
+```
+remote: GitLab: Commit must be signed with a GPG key
+! [remote rejected] main -> main (pre-receive hook declined)
+```
+
+**Quick Setup:**
+
+1. **Generate GPG key:**
+   ```sh
+   gpg --full-generate-key
+   # Choose RSA, 4096 bits, 1 year expiration
+   # Use your GitLab email address
+   ```
+
+2. **Add to GitLab:**
+   ```sh
+   gpg --armor --export your.email@example.com
+   # Copy output to GitLab → Settings → GPG Keys
+   ```
+
+3. **Configure Git:**
+   ```sh
+   gpg --list-secret-keys --keyid-format LONG
+   git config --global user.signingkey YOUR_KEY_ID
+   ```
+
+**Note:** Gitstart handles GPG signing automatically - you just need the key set up.
+
+**WSL Users:**
+
+If using Windows Subsystem for Linux:
+```sh
+echo 'export GPG_TTY=$(tty)' >> ~/.bashrc
+source ~/.bashrc
+
+# Install pinentry for passphrase prompts
+sudo apt install pinentry-curses
+echo 'pinentry-program /usr/bin/pinentry-curses' >> ~/.gnupg/gpg-agent.conf
+gpg-connect-agent reloadagent /bye
+```
+
+### Automatic Email Configuration
+
+Gitstart automatically sets the correct email address per repository based on provider:
+
+- **GitHub repos**: Uses GitHub email (configured in script)
+- **GitLab repos**: Uses GitLab/organization email (configured in script)
+
+This ensures commits have the appropriate identity for each platform.
+
+**Customization:** These emails are configured in the gitstart script (lines 369-374). Fork and customize for your organization.
 
 ### License Selection
 
