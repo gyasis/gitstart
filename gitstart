@@ -302,8 +302,7 @@ create_repo() {
         echo ">>> Creating GitLab repository..."
 
         # Build glab command with group if specified
-        # Use --remote-only to prevent glab from initializing directories
-        local glab_cmd="glab repo create \"$repo_name\" --remote-only"
+        local glab_cmd="glab repo create \"$repo_name\""
 
         if [[ -n "$group" ]]; then
             echo ">>> Using GitLab group/namespace: $group"
