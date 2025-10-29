@@ -374,9 +374,21 @@ elif [[ "$provider" == "gitlab" ]]; then
     git config user.signingkey "96132160E21A89003E03337A0AC7D767310FB350"
     echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
     echo ">>> Configured GPG signing key for GitLab"
+fi
 
-    # Set up remote for GitLab (since we init'd git ourselves)
+# Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
+if [[ "$provider" == "gitlab" ]]; then
+    if [ ! -d ".git" ]; then
+        echo ">>> Running git init."
+        git init || {
+            echo "Not able to initialize git."
+            exit 1
+        }
+    fi
+
+    # Check if remote already exists (glab might have added it)
     if ! git remote get-url origin >/dev/null 2>&1; then
+        # Set up remote for GitLab
         if [[ -n "$gitlab_group" ]]; then
             remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
         else
