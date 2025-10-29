@@ -355,27 +355,15 @@ else
     repo_visibility="public"
 fi
 
-# For GitLab, initialize git in target directory FIRST to avoid glab prompts
-if [[ "$provider" == "gitlab" ]]; then
-    cd "$dir" || exit
-    echo ">>> Initializing git repository."
-    git init || {
-        echo "Not able to initialize git."
-        exit 1
-    }
-fi
-
 # Create the remote repository
+# IMPORTANT: Stay in parent directory when calling glab to avoid nested dirs
 printf "Creating remote repo %s" "$dir"
 create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
     echo "Not able to create a remote repo."
     exit 1
 }
 
-# For GitHub, cd into directory after repo creation (gh clones it)
-if [[ "$provider" == "github" ]]; then
-    cd "$dir" || exit
-fi
+cd "$dir" || exit
 
 # Configure Git user email and signing based on provider
 if [[ "$provider" == "github" ]]; then
