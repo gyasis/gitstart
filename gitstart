@@ -301,10 +301,8 @@ create_repo() {
     elif [[ "$provider" == "gitlab" ]]; then
         echo ">>> Creating GitLab repository..."
 
-        # Build glab command with group and name
-        # Use current directory (.) as path since we already cd'd there
-        # Use -n flag to explicitly set the remote repo name
-        local glab_cmd="glab repo create . -n \"$repo_name\""
+        # Build glab command with just the repo name
+        local glab_cmd="glab repo create \"$repo_name\""
 
         if [[ -n "$group" ]]; then
             echo ">>> Using GitLab group/namespace: $group"
@@ -357,10 +355,14 @@ else
     repo_visibility="public"
 fi
 
-# For GitLab, cd into directory BEFORE creating remote repo to avoid parent dir initialization
+# For GitLab, initialize git in target directory FIRST to avoid glab prompts
 if [[ "$provider" == "gitlab" ]]; then
-    echo ">>> Changing to target directory: $dir"
     cd "$dir" || exit
+    echo ">>> Initializing git repository."
+    git init || {
+        echo "Not able to initialize git."
+        exit 1
+    }
 fi
 
 # Create the remote repository
@@ -370,7 +372,7 @@ create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
     exit 1
 }
 
-# For GitHub, cd into directory AFTER repo creation (gh repo create --clone already clones it)
+# For GitHub, cd into directory after repo creation (gh clones it)
 if [[ "$provider" == "github" ]]; then
     cd "$dir" || exit
 fi
@@ -384,27 +386,15 @@ elif [[ "$provider" == "gitlab" ]]; then
     git config user.signingkey "96132160E21A89003E03337A0AC7D767310FB350"
     echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
     echo ">>> Configured GPG signing key for GitLab"
-fi
 
-# Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
-if [[ "$provider" == "gitlab" ]]; then
-    if [ ! -d ".git" ]; then
-        echo ">>> Running git init."
-        git init || {
-            echo "Not able to initialize git."
-            exit 1
-        }
-    fi
-    
-    # Check if remote already exists (glab might have added it)
+    # Set up remote for GitLab (since we init'd git ourselves)
     if ! git remote get-url origin >/dev/null 2>&1; then
-        # Set up remote for GitLab
         if [[ -n "$gitlab_group" ]]; then
             remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
         else
             remote_url="git@gitlab.com:${current_username}/${repo}.git"
         fi
-        
+
         echo ">>> Adding remote origin: $remote_url"
         git remote add origin "$remote_url" || {
             echo "Not able to add remote."
