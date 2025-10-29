@@ -301,8 +301,10 @@ create_repo() {
     elif [[ "$provider" == "gitlab" ]]; then
         echo ">>> Creating GitLab repository..."
 
-        # Build glab command with group if specified
-        local glab_cmd="glab repo create \"$repo_name\""
+        # Build glab command with group and name
+        # Use current directory (.) as path since we already cd'd there
+        # Use -n flag to explicitly set the remote repo name
+        local glab_cmd="glab repo create . -n \"$repo_name\""
 
         if [[ -n "$group" ]]; then
             echo ">>> Using GitLab group/namespace: $group"
