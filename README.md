@@ -559,11 +559,28 @@ Choose from:
 
 ## 🤝 Contributing
 
+We welcome contributions! Whether you're fixing bugs, adding features, or improving documentation.
+
+**Quick Start for Contributors:**
+
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes and test thoroughly
+4. Commit your changes (`git commit -m 'feat: add some amazing feature'`)
+5. Push to the branch (`git push origin feature/amazing-feature`)
+6. Open a Pull Request
+
+**For detailed development workflow, testing, and using Awesome with local git repos:**
+
+📖 **See [DEV.md](DEV.md) for the complete development guide**
+
+The development guide covers:
+- Setting up your development environment
+- Installing and testing from your local fork
+- Working with hardcoded values
+- Testing both GitHub and GitLab workflows
+- Contributing guidelines and code style
+- Release process
 
 ## 📞 Support
 
