@@ -386,22 +386,35 @@ if [[ "$provider" == "gitlab" ]]; then
         }
     fi
 
-    # Check if remote already exists (glab might have added it)
-    if ! git remote get-url origin >/dev/null 2>&1; then
-        # Set up remote for GitLab
-        if [[ -n "$gitlab_group" ]]; then
-            remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
-        else
-            remote_url="git@gitlab.com:${current_username}/${repo}.git"
-        fi
+    # Determine correct remote URL
+    if [[ -n "$gitlab_group" ]]; then
+        expected_remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
+    else
+        expected_remote_url="git@gitlab.com:${current_username}/${repo}.git"
+    fi
 
-        echo ">>> Adding remote origin: $remote_url"
-        git remote add origin "$remote_url" || {
+    # Check if remote already exists
+    if git remote get-url origin >/dev/null 2>&1; then
+        # Remote exists, verify it's correct
+        current_remote=$(git remote get-url origin)
+        echo ">>> Found existing remote: $current_remote"
+
+        if [[ "$current_remote" != "$expected_remote_url" ]]; then
+            echo ">>> Updating remote origin to: $expected_remote_url"
+            git remote set-url origin "$expected_remote_url" || {
+                echo "Not able to update remote."
+                exit 1
+            }
+        else
+            echo ">>> Remote origin already correctly configured."
+        fi
+    else
+        # No remote exists, add it
+        echo ">>> Adding remote origin: $expected_remote_url"
+        git remote add origin "$expected_remote_url" || {
             echo "Not able to add remote."
             exit 1
         }
-    else
-        echo ">>> Remote origin already configured."
     fi
 fi
 
