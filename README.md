@@ -291,6 +291,141 @@ gitstart [ -l | --lang programming_language ] [ -d | --dir directory ] [ --githu
 - **Internal**: Visible to any authenticated user (GitLab-specific)
 - **Private**: Visible only to project members
 
+## 🔍 How It Works
+
+### Interactive Prompts You'll See
+
+When you run `gitstart`, you'll be asked to make several choices:
+
+#### 1. Username Confirmation
+```
+Is it correct your GitLab username is gyasis? y/yes/n/no:
+```
+- **What it does:** Confirms your cached username from `~/.gitstart_config` (GitHub) or `~/.gitstart_config_gitlab` (GitLab)
+- **Your choices:**
+  - `y` or `yes`: Use the displayed username
+  - `n` or `no`: Enter a new username (will be saved for next time)
+
+#### 2. License Selection
+```
+Select a license:
+1) MIT: I want it simple and permissive.
+2) Apache License 2.0: I need to work in a community.
+3) GNU GPLv3: I care about sharing improvements.
+4) None
+5) Quit
+Your license:
+```
+- **What it does:** Downloads the selected license from GitHub's License API
+- **Your choices:**
+  - `1`: MIT License - Simple, permissive, great for open source
+  - `2`: Apache 2.0 - Patent protection, good for corporate/community projects
+  - `3`: GNU GPLv3 - Copyleft, derivative works must also be open source
+  - `4`: None - No license file created
+  - `5`: Quit - Exit the script
+
+#### 3. Repository Visibility (GitLab Only)
+```
+Repository visibility:
+1) Public
+2) Internal
+3) Private
+4) Quit
+```
+- **What it does:** Sets who can see your GitLab repository
+- **Your choices:**
+  - `1`: Public - Anyone on the internet can see it
+  - `2`: Internal - Any logged-in GitLab user can see it (common for corporate instances)
+  - `3`: Private - Only you and invited members can see it
+  - `4`: Quit - Exit the script
+
+#### 4. GitLab CLI Prompts (GitLab Only)
+
+When using GitLab, `glab` may ask additional questions:
+
+**"Directory not git initialized. Run git init?"**
+- **Answer:** Say `No` or let it time out
+- **Why:** The script will initialize git itself with the correct configuration
+
+**"Create a local project directory for [group]/[repo]?"**
+- **Answer:** Say `Yes`
+- **Why:** This creates the local directory structure that matches your remote repo
+
+### What Gets Created
+
+After answering the prompts, gitstart creates:
+
+1. **📁 Directory Structure**
+   ```
+   my-repo/
+   ├── .git/           # Git repository (initialized)
+   ├── LICENSE         # Your chosen license
+   ├── .gitignore      # Language-specific or minimal
+   └── README.md       # Template with sections
+   ```
+
+2. **📄 README.md Template**
+   ```markdown
+   # my-repo
+
+   ## Overview
+
+   ## Requirement
+
+   ## Usage
+
+   ## Features
+
+   ## Reference
+
+   ## Author
+
+   ## License
+
+   Please see license.txt.
+   ```
+
+3. **🔗 Git Remote**
+   - **GitHub:** `git@github.com:username/repo.git`
+   - **GitLab:** `git@gitlab.com:group/repo.git` or `git@gitlab.com:username/repo.git`
+
+4. **📝 Initial Commit**
+   - Adds LICENSE, README.md, .gitignore
+   - Commits with message: "first commit"
+   - For GitLab: Signed with GPG (if configured)
+   - Pushes to main branch
+
+### Behind the Scenes Flow
+
+**GitHub:**
+1. Creates directory
+2. Runs `gh repo create --public/--private --clone`
+3. Downloads license file
+4. Downloads .gitignore (if language specified)
+5. Creates README.md
+6. Configures email: `user.email`
+7. Commits and pushes
+
+**GitLab:**
+1. Creates directory
+2. Runs `glab repo create -g group --internal/--public/--private`
+3. Verifies/creates `.git` directory with `git init`
+4. Verifies/corrects remote URL
+5. Configures email: `user.email`
+6. Configures GPG signing key: `user.signingkey`
+7. Downloads license file
+8. Downloads .gitignore (if language specified)
+9. Creates README.md
+10. Commits with GPG signature: `git commit -S`
+11. Pushes to main branch
+
+### Configuration Files Created
+
+- **`~/.gitstart_config`**: Stores your GitHub username
+- **`~/.gitstart_config_gitlab`**: Stores your GitLab username
+
+These are created automatically on first use and referenced on subsequent runs.
+
 ## 🏢 Setting Up for Your Organization
 
 ### For GitLab Organizations
