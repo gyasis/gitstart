@@ -159,6 +159,13 @@ export GITSTART_GITLAB_GROUP="proddev4/data"
 source ~/.bashrc  # or source ~/.zshrc
 ```
 
+**Pro Tip:** Use the `--subgroup` flag to append subgroups to your base group:
+```bash
+# Base group: proddev4/data
+# Command: gitstart -d my-repo --gitlab --subgroup backend
+# Result: Creates repo at proddev4/data/backend/my-repo
+```
+
 ## 📖 Usage
 
 ### Basic Examples
@@ -183,12 +190,22 @@ gitstart -d my-repo --gitlab
 # Create GitLab repo with specific group
 gitstart -d my-repo --gitlab -g mygroup/subgroup
 
+# Create GitLab repo in a subgroup (appends to base group)
+gitstart -d my-repo --gitlab --subgroup backend
+
 # Create GitLab repo with language
 gitstart -d my-repo -l javascript --gitlab
 
 # Work in current directory
 cd existing_directory
-gitstart . --gitlab
+gitstart -d . --gitlab
+
+# Work in current directory with custom repo name
+cd my-local-folder
+gitstart -d . --gitlab --repo production-api
+
+# Combine subgroup and custom repo name
+gitstart -d . --gitlab --subgroup microservices --repo user-service
 ```
 
 ### Complete Workflow Examples
@@ -270,15 +287,18 @@ Creating remote repo /home/user/customer-analytics
 ### Command Line Options
 
 ```
-gitstart [ -l | --lang programming_language ] [ -d | --dir directory ] [ --github | --gitlab ] [ -g | --group group_name ] [ -h | --help | -v | --version]
+gitstart [ -l | --lang programming_language ] [ -d | --dir directory ] [ -r | --repo repo_name ] [ --github | --gitlab ] [ -g | --group group_name ] [ --subgroup subgroup_name ] [ --no-remote ] [ -h | --help | -v | --version]
 ```
 
 #### Options
 - `-l, --lang` - Programming language for .gitignore template (e.g., python, javascript, go)
 - `-d, --dir` - Directory name for the new repository (use `.` for current directory)
+- `-r, --repo` - Custom repository name (overrides directory name - useful with `-d .`)
 - `--github` - Use GitHub as the Git provider (default)
 - `--gitlab` - Use GitLab as the Git provider
 - `-g, --group` - GitLab group/namespace (e.g., `proddev4/data`)
+- `--subgroup` - Append a subgroup to your base GitLab group (requires base group)
+- `--no-remote` - Create local repository only (no remote on GitHub/GitLab)
 - `-h, --help` - Show help message
 - `-v, --version` - Show version number
 

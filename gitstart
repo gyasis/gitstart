@@ -9,9 +9,12 @@ unset github_username dir repo license_url
 
 script_name=$(basename "$0")
 dir=""
+repo_name=""       # custom repository name (overrides directory name)
 version="0.3.0"
 provider="github"  # default to github for backward compatibility
 gitlab_group=""    # GitLab group/namespace
+gitlab_subgroup="" # GitLab subgroup to append to base group
+no_remote=false    # flag to skip remote repository creation
 gitstart_config=$HOME/.gitstart_config
 
 usage() {
@@ -23,12 +26,18 @@ Description:
 ============
 
 This script automate creating git repo.
-This will create a dir, add a license, README file, run git init and push to GitHub or GitLab. 
+This will create a dir, add a license, README file, run git init and push to GitHub or GitLab.
 
 If a language is added, it will try to add the .gitignore.
 Choose SSH as the default git protocol.
 
 For GitLab, you can specify a group/namespace using -g flag or GITSTART_GITLAB_GROUP environment variable. The script will guide you through setup if neither is configured.
+
+Use --subgroup to append a subgroup to your base GitLab group (requires base group from GITSTART_GITLAB_GROUP or -g flag).
+
+Use --repo to specify a custom repository name (useful with -d . to use a different name than the current directory).
+
+Use --no-remote to create a local repository with all scaffolding (license, .gitignore, README) without creating a remote repository or pushing to GitHub/GitLab.
 
 List of .gitignore supported by Github
 ======================================
@@ -38,18 +47,24 @@ See https://github.com/github/gitignore
 Usage:
 ======
 
-$script_name [ -l | --lang programming_language ] [ -d | --dir directory ] [ --github | --gitlab ] [ -g | --group group_name ] [ -h | --help | -v | --version]
+$script_name [ -l | --lang programming_language ] [ -d | --dir directory ] [ -r | --repo repo_name ] [ --github | --gitlab ] [ -g | --group group_name ] [ --subgroup subgroup_name ] [ --no-remote ] [ -h | --help | -v | --version]
 
 Examples:
 =========
 
     $script_name -d newrepo
-    $script_name -d newrepo -l python 
+    $script_name -d newrepo -l python
     $script_name -d newrepo --gitlab
     $script_name -d newrepo -l python --github
     $script_name -d newrepo --gitlab -g proddev4/data
+    $script_name -d newrepo --gitlab --subgroup anothergroup
+    $script_name -d newrepo --gitlab -g proddev4/data --subgroup myteam
+    $script_name -d newrepo --no-remote
     # in a directory
     $script_name -d .
+    # in current directory with custom repo name
+    $script_name -d . --repo my-custom-name
+    $script_name -d . --gitlab --repo different-name --subgroup backend
     # Show help
     $script_name -h
     # Show version
@@ -60,6 +75,7 @@ Environment Variables:
 
 GITSTART_GITLAB_GROUP - Default GitLab group/namespace (e.g., "proddev4/data")
                        Note: The -g flag overrides this environment variable
+                       Use --subgroup to append a subgroup to this base path
 EOF
 }
 
@@ -73,6 +89,10 @@ while (($# > 0)); do # while arguments count>0
         dir=$2
         shift 2
         ;;
+    -r | --repo)
+        repo_name=$2
+        shift 2
+        ;;
     --github)
         provider="github"
         shift
@@ -84,6 +104,14 @@ while (($# > 0)); do # while arguments count>0
     -g | --group)
         gitlab_group=$2
         shift 2
+        ;;
+    --subgroup)
+        gitlab_subgroup=$2
+        shift 2
+        ;;
+    --no-remote)
+        no_remote=true
+        shift
         ;;
     -h | --help)
         usage
@@ -101,16 +129,18 @@ while (($# > 0)); do # while arguments count>0
 done
 
 ##### check
-# Check for required CLI tool based on provider
-if [[ "$provider" == "github" ]]; then
-    if [ ! "$(command -v gh)" ]; then
-        echo "Please install gh from https://github.com/cli/cli#installation."
-        exit 1
-    fi
-elif [[ "$provider" == "gitlab" ]]; then
-    if [ ! "$(command -v glab)" ]; then
-        echo "Please install glab from https://gitlab.com/gitlab-org/cli/-/releases"
-        exit 1
+# Check for required CLI tool based on provider (skip if --no-remote is enabled)
+if [[ "$no_remote" == false ]]; then
+    if [[ "$provider" == "github" ]]; then
+        if [ ! "$(command -v gh)" ]; then
+            echo "Please install gh from https://github.com/cli/cli#installation."
+            exit 1
+        fi
+    elif [[ "$provider" == "gitlab" ]]; then
+        if [ ! "$(command -v glab)" ]; then
+            echo "Please install glab from https://gitlab.com/gitlab-org/cli/-/releases"
+            exit 1
+        fi
     fi
 fi
 
@@ -122,23 +152,38 @@ fi
 ############# Main body ############
 # Since SSH keys are configured, we skip auth checks and proceed directly
 
-# Set GitLab group/namespace from environment variable if not specified via flag
-if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
-    gitlab_group="${GITSTART_GITLAB_GROUP:-}"
-fi
-
-# Show GitLab configuration status
-if [[ "$provider" == "gitlab" && -n "$gitlab_group" ]]; then
-    if [[ -n "${GITSTART_GITLAB_GROUP:-}" && "$gitlab_group" == "$GITSTART_GITLAB_GROUP" ]]; then
-        echo "✅ Using GitLab group from environment: $gitlab_group"
-    else
-        echo "✅ Using GitLab group from -g flag: $gitlab_group"
+# Skip provider-specific configuration if --no-remote is enabled
+if [[ "$no_remote" == false ]]; then
+    # Set GitLab group/namespace from environment variable if not specified via flag
+    if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
+        gitlab_group="${GITSTART_GITLAB_GROUP:-}"
     fi
-    echo ""
-fi
 
-# Warning and guidance for GitLab without group configuration
-if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
+    # Append subgroup to base group if --subgroup is provided
+    if [[ "$provider" == "gitlab" && -n "$gitlab_subgroup" ]]; then
+        if [[ -z "$gitlab_group" ]]; then
+            echo "⚠️  WARNING: --subgroup requires a base group!"
+            echo "Set GITSTART_GITLAB_GROUP or use -g flag to specify base group."
+            exit 1
+        fi
+        # Append subgroup to base group (trim trailing slash from base if present)
+        gitlab_group="${gitlab_group%/}/$gitlab_subgroup"
+    fi
+
+    # Show GitLab configuration status
+    if [[ "$provider" == "gitlab" && -n "$gitlab_group" ]]; then
+        if [[ -n "$gitlab_subgroup" ]]; then
+            echo "✅ Using GitLab group with subgroup: $gitlab_group"
+        elif [[ -n "${GITSTART_GITLAB_GROUP:-}" && "$gitlab_group" == "$GITSTART_GITLAB_GROUP" ]]; then
+            echo "✅ Using GitLab group from environment: $gitlab_group"
+        else
+            echo "✅ Using GitLab group from -g flag: $gitlab_group"
+        fi
+        echo ""
+    fi
+
+    # Warning and guidance for GitLab without group configuration
+    if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
     echo "⚠️  WARNING: No GitLab group/namespace specified!"
     echo ""
     echo "GitLab repos will be created under your personal namespace."
@@ -168,6 +213,7 @@ if [[ "$provider" == "gitlab" && -z "$gitlab_group" ]]; then
             ;;
     esac
     echo ""
+    fi
 fi
 
 # Directory path. If dir is . then use pwd
@@ -225,27 +271,36 @@ get_username() {
     fi
 }
 
-# Get username based on provider
-if [[ "$provider" == "github" ]]; then
-    github_username=$(get_username "GitHub" "$gitstart_config" "gyasis")
-elif [[ "$provider" == "gitlab" ]]; then
-    gitlab_config="$HOME/.gitstart_config_gitlab"
-    gitlab_username=$(get_username "GitLab" "$gitlab_config" "gyasis")
+# Get username based on provider (skip if --no-remote is enabled)
+if [[ "$no_remote" == false ]]; then
+    if [[ "$provider" == "github" ]]; then
+        github_username=$(get_username "GitHub" "$gitstart_config" "gyasis")
+    elif [[ "$provider" == "gitlab" ]]; then
+        gitlab_config="$HOME/.gitstart_config_gitlab"
+        gitlab_username=$(get_username "GitLab" "$gitlab_config" "gyasis")
+    fi
+
+    # Display username and repo info based on provider
+    if [[ "$provider" == "github" ]]; then
+        echo ">>> Your GitHub username is ${github_username}."
+        current_username="$github_username"
+    elif [[ "$provider" == "gitlab" ]]; then
+        echo ">>> Your GitLab username is ${gitlab_username}."
+        current_username="$gitlab_username"
+    fi
+    echo ">>> Using provider: ${provider}"
 fi
 
-repo=$(basename "${dir}")
+# Use custom repo name if provided, otherwise use directory name
+if [[ -n "$repo_name" ]]; then
+    repo="$repo_name"
+    echo ">>> Using custom repo name: ${repo}"
+else
+    repo=$(basename "${dir}")
+    echo ">>> Your new repo name is ${repo}."
+fi
+
 license_url="mit"
-
-# Display username and repo info based on provider
-if [[ "$provider" == "github" ]]; then
-    echo ">>> Your GitHub username is ${github_username}."
-    current_username="$github_username"
-elif [[ "$provider" == "gitlab" ]]; then
-    echo ">>> Your GitLab username is ${gitlab_username}."
-    current_username="$gitlab_username"
-fi
-echo ">>> Your new repo name is ${repo}."
-echo ">>> Using provider: ${provider}"
 
 # license
 PS3='Your license: '
@@ -323,61 +378,55 @@ create_repo() {
     fi
 }
 
-# Get visibility preference for GitLab (GitHub only has public/private)
-if [[ "$provider" == "gitlab" ]]; then
-    echo ">>> You are using GitLab. Choose visibility:"
-    PS3='Repository visibility: '
-    visibilities=("Public" "Internal" "Private" "Quit")
-    
-    select visibility in "${visibilities[@]}"; do
-        case ${visibility} in
-            "Public")
-                repo_visibility="public"
-                break
-                ;;
-            "Internal")
-                repo_visibility="internal"
-                break
-                ;;
-            "Private")
-                repo_visibility="private"
-                break
-                ;;
-            "Quit")
-                echo "User requested exit."
-                exit
-                ;;
-            *) echo "Invalid option $REPLY" ;;
-        esac
-    done
-else
-    # GitHub - default to public for backward compatibility
-    repo_visibility="public"
-fi
+# Get visibility preference and create remote repository (skip if --no-remote is enabled)
+if [[ "$no_remote" == false ]]; then
+    if [[ "$provider" == "gitlab" ]]; then
+        echo ">>> You are using GitLab. Choose visibility:"
+        PS3='Repository visibility: '
+        visibilities=("Public" "Internal" "Private" "Quit")
 
-# Create the remote repository
-# IMPORTANT: Stay in parent directory when calling glab to avoid nested dirs
-printf "Creating remote repo %s" "$dir"
-create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
-    echo "Not able to create a remote repo."
-    exit 1
-}
+        select visibility in "${visibilities[@]}"; do
+            case ${visibility} in
+                "Public")
+                    repo_visibility="public"
+                    break
+                    ;;
+                "Internal")
+                    repo_visibility="internal"
+                    break
+                    ;;
+                "Private")
+                    repo_visibility="private"
+                    break
+                    ;;
+                "Quit")
+                    echo "User requested exit."
+                    exit
+                    ;;
+                *) echo "Invalid option $REPLY" ;;
+            esac
+        done
+    else
+        # GitHub - default to public for backward compatibility
+        repo_visibility="public"
+    fi
+
+    # Create the remote repository
+    # IMPORTANT: Stay in parent directory when calling glab to avoid nested dirs
+    printf "Creating remote repo %s\n" "$dir"
+    create_repo "$provider" "$repo" "$repo_visibility" "$gitlab_group" || {
+        echo "Not able to create a remote repo."
+        exit 1
+    }
+else
+    echo ">>> Skipping remote repository creation (--no-remote enabled)."
+fi
 
 cd "$dir" || exit
 
-# Configure Git user email and signing based on provider
-if [[ "$provider" == "github" ]]; then
-    git config user.email "gyasis@gmail.com"
-    echo ">>> Configured Git email for GitHub: gyasis@gmail.com"
-elif [[ "$provider" == "gitlab" ]]; then
-    git config user.email "gyasi.sutton@herself-health.com"
-    git config user.signingkey "96132160E21A89003E03337A0AC7D767310FB350"
-    echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
-    echo ">>> Configured GPG signing key for GitLab"
-fi
-
-# Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
-if [[ "$provider" == "gitlab" ]]; then
+# Initialize git repository locally
+if [[ "$no_remote" == true ]]; then
+    # For --no-remote mode, always initialize git if not already done
     if [ ! -d ".git" ]; then
         echo ">>> Running git init."
         git init || {
@@ -385,36 +434,59 @@ if [[ "$provider" == "gitlab" ]]; then
             exit 1
         }
     fi
-
-    # Determine correct remote URL
-    if [[ -n "$gitlab_group" ]]; then
-        expected_remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
-    else
-        expected_remote_url="git@gitlab.com:${current_username}/${repo}.git"
+else
+    # For remote mode, configure provider-specific settings
+    # Configure Git user email and signing based on provider
+    if [[ "$provider" == "github" ]]; then
+        git config user.email "gyasis@gmail.com"
+        echo ">>> Configured Git email for GitHub: gyasis@gmail.com"
+    elif [[ "$provider" == "gitlab" ]]; then
+        git config user.email "gyasi.sutton@herself-health.com"
+        git config user.signingkey "96132160E21A89003E03337A0AC7D767310FB350"
+        echo ">>> Configured Git email for GitLab: gyasi.sutton@herself-health.com"
+        echo ">>> Configured GPG signing key for GitLab"
     fi
 
-    # Check if remote already exists
-    if git remote get-url origin >/dev/null 2>&1; then
-        # Remote exists, verify it's correct
-        current_remote=$(git remote get-url origin)
-        echo ">>> Found existing remote: $current_remote"
-
-        if [[ "$current_remote" != "$expected_remote_url" ]]; then
-            echo ">>> Updating remote origin to: $expected_remote_url"
-            git remote set-url origin "$expected_remote_url" || {
-                echo "Not able to update remote."
+    # Initialize git and set up remote for GitLab (GitHub CLI handles this automatically)
+    if [[ "$provider" == "gitlab" ]]; then
+        if [ ! -d ".git" ]; then
+            echo ">>> Running git init."
+            git init || {
+                echo "Not able to initialize git."
                 exit 1
             }
-        else
-            echo ">>> Remote origin already correctly configured."
         fi
-    else
-        # No remote exists, add it
-        echo ">>> Adding remote origin: $expected_remote_url"
-        git remote add origin "$expected_remote_url" || {
-            echo "Not able to add remote."
-            exit 1
-        }
+
+        # Determine correct remote URL
+        if [[ -n "$gitlab_group" ]]; then
+            expected_remote_url="git@gitlab.com:${gitlab_group}/${repo}.git"
+        else
+            expected_remote_url="git@gitlab.com:${current_username}/${repo}.git"
+        fi
+
+        # Check if remote already exists
+        if git remote get-url origin >/dev/null 2>&1; then
+            # Remote exists, verify it's correct
+            current_remote=$(git remote get-url origin)
+            echo ">>> Found existing remote: $current_remote"
+
+            if [[ "$current_remote" != "$expected_remote_url" ]]; then
+                echo ">>> Updating remote origin to: $expected_remote_url"
+                git remote set-url origin "$expected_remote_url" || {
+                    echo "Not able to update remote."
+                    exit 1
+                }
+            else
+                echo ">>> Remote origin already correctly configured."
+            fi
+        else
+            # No remote exists, add it
+            echo ">>> Adding remote origin: $expected_remote_url"
+            git remote add origin "$expected_remote_url" || {
+                echo "Not able to add remote."
+                exit 1
+            }
+        fi
     fi
 fi
 
@@ -469,12 +541,14 @@ git add . || {
     exit 1
 }
 echo ">>> Commiting with a message 'first commit'."
-if [[ "$provider" == "gitlab" ]]; then
+if [[ "$no_remote" == false && "$provider" == "gitlab" ]]; then
+    # Use GPG signing for GitLab when pushing to remote
     git commit -S -m "first commit" || {
         echo "Not able to commit."
         exit 1
     }
 else
+    # Standard commit for GitHub or local-only mode
     git commit -m "first commit" || {
         echo "Not able to commit."
         exit 1
@@ -484,20 +558,27 @@ git branch -M main || {
     echo "Not able to add the branch"
     exit 1
 }
-git push -u origin main || {
-    echo "Not able to push to a remote repo."
-    exit 1
-}
 
-# Display success message with correct URL
-if [[ "$provider" == "github" ]]; then
-    echo ">>> You have created a GitHub repo at https://github.com/${current_username}/${repo}"
-elif [[ "$provider" == "gitlab" ]]; then
-    if [[ -n "$gitlab_group" ]]; then
-        echo ">>> You have created a GitLab repo at https://gitlab.com/${gitlab_group}/${repo}"
-    else
-        echo ">>> You have created a GitLab repo at https://gitlab.com/${current_username}/${repo}"
+# Push to remote repository (skip if --no-remote is enabled)
+if [[ "$no_remote" == false ]]; then
+    git push -u origin main || {
+        echo "Not able to push to a remote repo."
+        exit 1
+    }
+
+    # Display success message with correct URL
+    if [[ "$provider" == "github" ]]; then
+        echo ">>> You have created a GitHub repo at https://github.com/${current_username}/${repo}"
+    elif [[ "$provider" == "gitlab" ]]; then
+        if [[ -n "$gitlab_group" ]]; then
+            echo ">>> You have created a GitLab repo at https://gitlab.com/${gitlab_group}/${repo}"
+        else
+            echo ">>> You have created a GitLab repo at https://gitlab.com/${current_username}/${repo}"
+        fi
     fi
+else
+    echo ">>> Successfully created local repository at ${dir}"
+    echo ">>> Repository initialized with license, .gitignore, and README.md"
 fi
 
 exit 0
